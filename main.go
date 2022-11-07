@@ -10,7 +10,7 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Printf("Usage: hx <filepath>")
+		fmt.Printf("Usage: hx <filepath>\n")
 		os.Exit(1)
 	}
 
@@ -55,6 +55,11 @@ func printDumpLine(fileOffset int, start int, bytesRead []byte) int {
 		count = 16
 	}
 
+	res := ""
+
+	// this is a workaround because I can't use len(res)
+	charCount := 0
+
 	ascii := ""
 
 	for i := 0; i < count; i++ {
@@ -66,30 +71,28 @@ func printDumpLine(fileOffset int, start int, bytesRead []byte) int {
 			ascii += "."
 		}
 
-		high := b & 0b11110000 >> 4
+		high := (b & 0b11110000) >> 4
 		low := b & 0b00001111
 
-		highBold := high / 8
-		high %= 8
+		highBold := (high / 8) % 2
+		lowBold := (low / 8) % 2
 
-		lowBold := low / 8
-		low %= 8
+		highColor := fmt.Sprintf("\033[%d;%dm", highBold, high%7+31)
+		lowColor := fmt.Sprintf("\033[%d;%dm", lowBold, low%7+31)
 
-		highColor := fmt.Sprintf("\033[%d;%dm", highBold, high+30)
-		lowColor := fmt.Sprintf("\033[%d;%dm", lowBold, low+30)
-
-		fmt.Printf("%s%x%s%x ", highColor, high, lowColor, low)
+		res += fmt.Sprintf("%s%x%s%x ", highColor, high, lowColor, low)
+		charCount += 3
 
 		if (i+1)%4 == 0 {
-			fmt.Print(" ")
+			res += " "
+			charCount += 1
 		}
 	}
 
-	maxSpace := 2*16 + 1*16 + 16/2
-	actualSpace := 2*count + 1*count + count/2
+	maxLength := 53
 
-	fmt.Print(strings.Repeat(" ", maxSpace-actualSpace))
-	fmt.Print("    ")
+	fmt.Print(res)
+	fmt.Print(strings.Repeat(" ", maxLength-charCount))
 	fmt.Print("\033[0m")
 	fmt.Printf("|%s|", ascii)
 	fmt.Println()
