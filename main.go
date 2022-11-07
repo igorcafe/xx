@@ -22,7 +22,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	bytesRead := make([]byte, 1024)
+	bytesRead := make([]byte, 1024*1024)
 	totalOffset := 0
 
 	for {
@@ -36,10 +36,26 @@ func main() {
 			os.Exit(1)
 		}
 
+		prevLine := ""
+		printedAsterisk := false
+
 		for currentOffset := 0; currentOffset < n; {
-			printed := printDumpLine(totalOffset, currentOffset, bytesRead[:n])
-			currentOffset += printed
-			totalOffset += printed
+			line, bytesCount := getDumpLine(totalOffset, currentOffset, bytesRead[:n])
+
+			addr := fmt.Sprintf("%s%08x:%s   ", "\033[1m", totalOffset, "\033[0m")
+
+			if line != prevLine {
+				fmt.Print(addr, line)
+				prevLine = line
+				printedAsterisk = false
+
+			} else if !printedAsterisk {
+				fmt.Println("*")
+				printedAsterisk = true
+			}
+
+			currentOffset += bytesCount
+			totalOffset += bytesCount
 		}
 	}
 
@@ -47,8 +63,7 @@ func main() {
 	fmt.Println()
 }
 
-func printDumpLine(fileOffset int, start int, bytesRead []byte) int {
-	fmt.Printf("%s%08x:%s   ", "\033[1m", fileOffset, "\033[0m")
+func getDumpLine(fileOffset int, start int, bytesRead []byte) (string, int) {
 
 	count := len(bytesRead) - start
 	if count > 16 {
@@ -64,23 +79,18 @@ func printDumpLine(fileOffset int, start int, bytesRead []byte) int {
 
 	for i := 0; i < count; i++ {
 		b := bytesRead[start+i]
+		color := fmt.Sprintf("\033[1;37m\033[38;5;%dm", b)
+		if b == 0 || (b >= 16 && b <= 18) || (b >= 232 && b <= 242) {
+			color = fmt.Sprintf("\033[1;37m\033[48;5;%dm\033[38;5;255m", b)
+		}
 
-		if b >= 32 && b <= 127 {
-			ascii += string(b)
+		if b >= 32 && b <= 126 {
+			ascii += color + string(b) + "\033[0m"
 		} else {
 			ascii += "."
 		}
 
-		high := (b & 0b11110000) >> 4
-		low := b & 0b00001111
-
-		highBold := (high / 8) % 2
-		lowBold := (low / 8) % 2
-
-		highColor := fmt.Sprintf("\033[%d;%dm", highBold, high%7+31)
-		lowColor := fmt.Sprintf("\033[%d;%dm", lowBold, low%7+31)
-
-		res += fmt.Sprintf("%s%x%s%x ", highColor, high, lowColor, low)
+		res += fmt.Sprintf("%s%02x%s ", color, b, "\033[0m")
 		charCount += 3
 
 		if (i+1)%4 == 0 {
@@ -91,11 +101,9 @@ func printDumpLine(fileOffset int, start int, bytesRead []byte) int {
 
 	maxLength := 53
 
-	fmt.Print(res)
-	fmt.Print(strings.Repeat(" ", maxLength-charCount))
-	fmt.Print("\033[0m")
-	fmt.Printf("|%s|", ascii)
-	fmt.Println()
+	res += strings.Repeat(" ", maxLength-charCount)
+	res += "\033[0m"
+	res += fmt.Sprintf("|%s|\n", ascii)
 
-	return count
+	return res, count
 }
