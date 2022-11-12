@@ -36,31 +36,35 @@ func main() {
 			os.Exit(1)
 		}
 
-		prevLine := ""
-		printedAsterisk := false
-
-		for currentOffset := 0; currentOffset < n; {
-			line, bytesCount := getDumpLine(totalOffset, currentOffset, bytesRead[:n])
-
-			addr := fmt.Sprintf("%s%08x:%s   ", "\033[1m", totalOffset, "\033[0m")
-
-			if line != prevLine {
-				fmt.Print(addr, line)
-				prevLine = line
-				printedAsterisk = false
-
-			} else if !printedAsterisk {
-				fmt.Println("*")
-				printedAsterisk = true
-			}
-
-			currentOffset += bytesCount
-			totalOffset += bytesCount
-		}
+		dumpBuffer(totalOffset, bytesRead[:n])
 	}
 
 	fmt.Print("\033[0m")
 	fmt.Println()
+}
+
+func dumpBuffer(totalOffset int, bytesRead []byte) {
+	prevLine := ""
+	printedAsterisk := false
+
+	for currentOffset := 0; currentOffset < len(bytesRead); {
+		line, bytesCount := getDumpLine(totalOffset, currentOffset, bytesRead)
+
+		addr := fmt.Sprintf("%s%08x:%s   ", "\033[1m", totalOffset, "\033[0m")
+
+		if line != prevLine {
+			fmt.Print(addr, line)
+			prevLine = line
+			printedAsterisk = false
+
+		} else if !printedAsterisk {
+			fmt.Println("*")
+			printedAsterisk = true
+		}
+
+		currentOffset += bytesCount
+		totalOffset += bytesCount
+	}
 }
 
 func getDumpLine(fileOffset int, start int, bytesRead []byte) (string, int) {
