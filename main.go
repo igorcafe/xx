@@ -52,7 +52,7 @@ func dumpBuffer(totalOffset int, bytesRead []byte) {
 	printedAsterisk := false
 
 	for currentOffset := 0; currentOffset < len(bytesRead); {
-		line, bytesCount := getDumpLine(totalOffset, currentOffset, bytesRead)
+		line, bytesCount := getDumpLine(currentOffset, bytesRead)
 
 		addr := fmt.Sprintf("%s%08x:%s   ", NO_COLOR_B, totalOffset, NO_COLOR)
 
@@ -71,7 +71,7 @@ func dumpBuffer(totalOffset int, bytesRead []byte) {
 	}
 }
 
-func getDumpLine(fileOffset int, start int, bytesRead []byte) (string, int) {
+func getDumpLine(start int, bytesRead []byte) (string, int) {
 	count := len(bytesRead) - start
 	if count > 16 {
 		count = 16
