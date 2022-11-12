@@ -8,6 +8,10 @@ import (
 	"strings"
 )
 
+const WHITE_B = "\033[1;37m"
+const NO_COLOR = "\033[0m"
+const NO_COLOR_B = "\033[1m"
+
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Printf("Usage: hx <filepath>\n")
@@ -22,7 +26,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	bytesRead := make([]byte, 1024*1024)
+	bytesRead := make([]byte, 1024*1024) // TODO: optimal buffer size
 	totalOffset := 0
 
 	for {
@@ -39,7 +43,7 @@ func main() {
 		dumpBuffer(totalOffset, bytesRead[:n])
 	}
 
-	fmt.Print("\033[0m")
+	fmt.Print(NO_COLOR)
 	fmt.Println()
 }
 
@@ -50,7 +54,7 @@ func dumpBuffer(totalOffset int, bytesRead []byte) {
 	for currentOffset := 0; currentOffset < len(bytesRead); {
 		line, bytesCount := getDumpLine(totalOffset, currentOffset, bytesRead)
 
-		addr := fmt.Sprintf("%s%08x:%s   ", "\033[1m", totalOffset, "\033[0m")
+		addr := fmt.Sprintf("%s%08x:%s   ", NO_COLOR_B, totalOffset, NO_COLOR)
 
 		if line != prevLine {
 			fmt.Print(addr, line)
@@ -68,7 +72,6 @@ func dumpBuffer(totalOffset int, bytesRead []byte) {
 }
 
 func getDumpLine(fileOffset int, start int, bytesRead []byte) (string, int) {
-
 	count := len(bytesRead) - start
 	if count > 16 {
 		count = 16
@@ -83,18 +86,22 @@ func getDumpLine(fileOffset int, start int, bytesRead []byte) (string, int) {
 
 	for i := 0; i < count; i++ {
 		b := bytesRead[start+i]
-		color := fmt.Sprintf("\033[1;37m\033[38;5;%dm", b)
+		fg := color256(b, true)
+		color := WHITE_B + fg
+
 		if b == 0 || (b >= 16 && b <= 18) || (b >= 232 && b <= 242) {
-			color = fmt.Sprintf("\033[1;37m\033[48;5;%dm\033[38;5;255m", b)
+			fg := color256(255, true)
+			bg := color256(b, false)
+			color = WHITE_B + bg + fg
 		}
 
 		if b >= 32 && b <= 126 {
-			ascii += color + string(b) + "\033[0m"
+			ascii += color + string(b) + NO_COLOR
 		} else {
 			ascii += "."
 		}
 
-		res += fmt.Sprintf("%s%02x%s ", color, b, "\033[0m")
+		res += fmt.Sprintf("%s%02x%s ", color, b, NO_COLOR)
 		charCount += 3
 
 		if (i+1)%4 == 0 {
@@ -106,8 +113,17 @@ func getDumpLine(fileOffset int, start int, bytesRead []byte) (string, int) {
 	maxLength := 53
 
 	res += strings.Repeat(" ", maxLength-charCount)
-	res += "\033[0m"
+	res += NO_COLOR
 	res += fmt.Sprintf("|%s|\n", ascii)
 
 	return res, count
+}
+
+func color256(b byte, foreground bool) string {
+	colorType := 48
+	if foreground {
+		colorType = 38
+	}
+
+	return fmt.Sprintf("\033[%d;5;%dm", colorType, b)
 }
