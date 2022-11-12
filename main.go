@@ -87,15 +87,21 @@ func getDumpLine(fileOffset int, start int, bytesRead []byte) (string, int) {
 	for i := 0; i < count; i++ {
 		b := bytesRead[start+i]
 		fg := color256(b, true)
-		color := WHITE_B + fg
+		bg := ""
 
-		if b == 0 || (b >= 16 && b <= 18) || (b >= 232 && b <= 242) {
-			fg := color256(255, true)
-			bg := color256(b, false)
-			color = WHITE_B + bg + fg
+		// colors that are barely readable with dark background
+		useBrightBg := b == 0 || (b >= 16 && b <= 18) || (b >= 232 && b <= 242)
+
+		if useBrightBg {
+			fg = color256(255, true)
+			bg = color256(b, false)
 		}
 
-		if b >= 32 && b <= 126 {
+		color := WHITE_B + bg + fg
+
+		isPrintableAscii := b >= 32 && b <= 126
+
+		if isPrintableAscii {
 			ascii += color + string(b) + NO_COLOR
 		} else {
 			ascii += "."
