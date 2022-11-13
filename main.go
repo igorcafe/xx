@@ -82,7 +82,7 @@ func getDumpLine(bytesRead []byte) (string, int) {
 	// this is a workaround because I can't use len(res)
 	charCount := 0
 
-	ascii := ""
+	asciiBuilder := strings.Builder{}
 
 	for i := 0; i < count; i++ {
 		b := bytesRead[i]
@@ -102,9 +102,9 @@ func getDumpLine(bytesRead []byte) (string, int) {
 		isPrintableAscii := b >= 32 && b <= 126
 
 		if isPrintableAscii {
-			ascii += color + string(b) + NO_COLOR
+			asciiBuilder.WriteString(color + string(b) + NO_COLOR)
 		} else {
-			ascii += "."
+			asciiBuilder.WriteString(".")
 		}
 
 		resBuilder.WriteString(fmt.Sprintf("%s%02x%s ", color, b, NO_COLOR))
@@ -120,7 +120,7 @@ func getDumpLine(bytesRead []byte) (string, int) {
 
 	resBuilder.WriteString(strings.Repeat(" ", maxLength-charCount))
 	resBuilder.WriteString(NO_COLOR)
-	resBuilder.WriteString(fmt.Sprintf("|%s|\n", ascii))
+	resBuilder.WriteString(fmt.Sprintf("|%s|\n", asciiBuilder.String()))
 
 	return resBuilder.String(), count
 }
