@@ -52,7 +52,7 @@ func dumpBuffer(totalOffset int, bytesRead []byte) {
 	printedAsterisk := false
 
 	for currentOffset := 0; currentOffset < len(bytesRead); {
-		line, bytesCount := getDumpLine(currentOffset, bytesRead)
+		line, bytesCount := getDumpLine(bytesRead[currentOffset:])
 
 		addr := fmt.Sprintf("%s%08x:%s   ", NO_COLOR_B, totalOffset, NO_COLOR)
 
@@ -71,8 +71,8 @@ func dumpBuffer(totalOffset int, bytesRead []byte) {
 	}
 }
 
-func getDumpLine(start int, bytesRead []byte) (string, int) {
-	count := len(bytesRead) - start
+func getDumpLine(bytesRead []byte) (string, int) {
+	count := len(bytesRead)
 	if count > 16 {
 		count = 16
 	}
@@ -85,7 +85,7 @@ func getDumpLine(start int, bytesRead []byte) (string, int) {
 	ascii := ""
 
 	for i := 0; i < count; i++ {
-		b := bytesRead[start+i]
+		b := bytesRead[i]
 		fg := color256(b, true)
 		bg := ""
 
