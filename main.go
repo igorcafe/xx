@@ -110,7 +110,7 @@ func getDumpLine(bytesRead []byte) (string, int) {
 		}
 
 		resBuilder.WriteString(color)
-		resBuilder.WriteString(fmt.Sprintf("%02x", b)) // TODO: func with 0 alloc/op
+		resBuilder.WriteString(byteToAsciiHex(b))
 		resBuilder.WriteString(NO_COLOR)
 		resBuilder.WriteString(" ")
 		charCount += 3
@@ -137,4 +137,29 @@ func color256(b byte, foreground bool) string {
 	}
 
 	return fmt.Sprintf("\033[%d;5;%dm", colorType, b)
+}
+
+func byteToAsciiHex(b byte) string {
+	asciiZeroPosition := byte(48)
+	asciiAPosition := byte(97)
+
+	low := b & 0x0F
+	high := (b & 0xF0) >> 4
+
+	var lowString string
+	var highString string
+
+	if low <= 0x9 {
+		lowString = string(low + asciiZeroPosition)
+	} else {
+		lowString = string(low + asciiAPosition - 0x0a)
+	}
+
+	if high <= 0x9 {
+		highString = string(high + asciiZeroPosition)
+	} else {
+		highString = string(high + asciiAPosition - 0x0a)
+	}
+
+	return highString + lowString
 }

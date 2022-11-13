@@ -62,3 +62,28 @@ func BenchmarkGetDumpLine(b *testing.B) {
 		_, _ = getDumpLine(buf)
 	}
 }
+
+func TestByteToAsciiHex(t *testing.T) {
+	assert.Equal(t, "00", byteToAsciiHex(0x00))
+	assert.Equal(t, "0f", byteToAsciiHex(0x0F))
+	assert.Equal(t, "0a", byteToAsciiHex(0x0A))
+	assert.Equal(t, "10", byteToAsciiHex(0x10))
+	assert.Equal(t, "ff", byteToAsciiHex(0xFF))
+	assert.Equal(t, "c9", byteToAsciiHex(0xC9))
+}
+
+func BenchmarkByteToHex_byteToHex1000(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		for j := 0; j < 1000; j++ {
+			_ = byteToAsciiHex(100)
+		}
+	}
+}
+
+func BenchmarkByteToHex_Sprintf1000(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		for j := 0; j < 1000; j++ {
+			_ = fmt.Sprintf("%02x", 100)
+		}
+	}
+}
