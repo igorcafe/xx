@@ -109,7 +109,10 @@ func getDumpLine(bytesRead []byte) (string, int) {
 			asciiBuilder.WriteString(".")
 		}
 
-		resBuilder.WriteString(fmt.Sprintf("%s%02x%s ", color, b, NO_COLOR))
+		resBuilder.WriteString(color)
+		resBuilder.WriteString(fmt.Sprintf("%02x", b)) // TODO: func with 0 alloc/op
+		resBuilder.WriteString(NO_COLOR)
+		resBuilder.WriteString(" ")
 		charCount += 3
 
 		if (i+1)%4 == 0 {
