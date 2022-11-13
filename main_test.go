@@ -34,34 +34,26 @@ func getMd5String(b []byte) string {
 	return hex.EncodeToString(sum[:])
 }
 
-func TestProgramOutput(t *testing.T) {
-	_, err := execLine("go build -o hx main.go")
-	assert.NoError(t, err)
-
-	t.Run("sample 1", func(t *testing.T) {
-		out, err := execLine("./hx testdata/sample1.txt")
-		assert.NoError(t, err)
-
-		want := "ef2836c8ff54814ac71922ad5c12016a"
-		got := getMd5String(out)
-		assert.Equal(t, want, got)
-	})
-
-	t.Run("sample 2", func(t *testing.T) {
-		out, err := execLine("./hx testdata/sample2.txt")
-		assert.NoError(t, err)
-
-		want := "0ee98efaed7f8d505a2399d489889b08"
-		got := getMd5String(out)
-		assert.Equal(t, want, got)
-	})
-}
-
 func BenchmarkGetDumpLine(b *testing.B) {
-	buf := []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
+	buf := make([]byte, 16)
+
+	for i := 0; i < 16; i++ {
+		buf[i] = 0x5a
+	}
+
+	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
 		_, _ = getDumpLine(buf)
+	}
+}
+
+func BenchmarkDumpBuffer(b *testing.B) {
+	buf := []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
+	os.Stdout = nil
+
+	for i := 0; i < b.N; i++ {
+		dumpBuffer(0, buf)
 	}
 }
 
@@ -86,14 +78,6 @@ func BenchmarkByteToHex_Sprintf1000(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		for j := 0; j < 1000; j++ {
 			_ = fmt.Sprintf("%02x", 100)
-		}
-	}
-}
-
-func BenchmarkColor256_1000(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		for j := 0; j < 1000; j++ {
-			_ = color256(123, true)
 		}
 	}
 }

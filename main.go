@@ -16,12 +16,15 @@ const NO_COLOR_B = "\033[1m"
 const ASCII_0_POSITION = byte(48)
 const ASCII_A_POSITION = byte(97)
 
+var colors [256]string
+
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Printf("Usage: hx <filepath>\n")
 		os.Exit(1)
 	}
 
+	precomputeColors()
 	filepath := os.Args[1]
 
 	file, err := os.OpenFile(filepath, os.O_RDONLY, 0666) // FIXME: perm
@@ -58,7 +61,7 @@ func dumpBuffer(totalOffset int, bytesRead []byte) {
 	for currentOffset := 0; currentOffset < len(bytesRead); {
 		line, bytesCount := getDumpLine(bytesRead[currentOffset:])
 
-		addr := fmt.Sprintf("%s%08x:%s   ", NO_COLOR_B, totalOffset, NO_COLOR)
+		addr := NO_COLOR_B + fmt.Sprintf("%08x:", totalOffset) + NO_COLOR + "   "
 
 		if line != prevLine {
 			fmt.Print(addr, line)
@@ -82,38 +85,14 @@ func getDumpLine(bytesRead []byte) (string, int) {
 	}
 
 	resBuilder := strings.Builder{}
-	resBuilder.Grow(413) // FIXME: magic number
+	resBuilder.Grow(208) // FIXME: magic number
 
-	// this is a workaround because I can't use len(res)
+	// this is a workaround because I can't use resBuilder.Len()
 	charCount := 0
-
-	asciiBuilder := strings.Builder{}
-	asciiBuilder.Grow(count)
 
 	for i := 0; i < count; i++ {
 		b := bytesRead[i]
-		fg := ""
-		bg := ""
-
-		// colors that are barely readable with dark background
-		useBrightBg := b == 0 || (b >= 16 && b <= 18) || (b >= 232 && b <= 242)
-
-		if useBrightBg {
-			fg = color256(255, true)
-			bg = color256(b, false)
-		} else {
-			fg = color256(b, true)
-		}
-
-		color := WHITE_B + bg + fg
-
-		isPrintableAscii := b >= 32 && b <= 126
-
-		if isPrintableAscii {
-			asciiBuilder.WriteString(color + string(b) + NO_COLOR)
-		} else {
-			asciiBuilder.WriteString(".")
-		}
+		color := colors[b]
 
 		resBuilder.WriteString(color)
 		resBuilder.WriteString(byteToAsciiHex(b))
@@ -128,19 +107,48 @@ func getDumpLine(bytesRead []byte) (string, int) {
 	}
 
 	maxLength := 53 // FIXME: magic number
-
 	resBuilder.WriteString(strings.Repeat(" ", maxLength-charCount))
-	resBuilder.WriteString(NO_COLOR)
-	resBuilder.WriteString("|" + asciiBuilder.String() + "|\n")
+	resBuilder.WriteString(NO_COLOR + "|")
+
+	for i := 0; i < count; i++ {
+		b := bytesRead[i]
+		color := colors[b]
+
+		isPrintableAscii := b >= 32 && b <= 126
+
+		if isPrintableAscii {
+			resBuilder.WriteString(color + string(b) + NO_COLOR)
+		} else {
+			resBuilder.WriteString(".")
+		}
+	}
+
+	resBuilder.WriteString(NO_COLOR + "|\n")
+
+	l := resBuilder.Len()
+	_ = l
 
 	return resBuilder.String(), count
 }
 
-func color256(b byte, foreground bool) string {
-	if foreground {
-		return "\033[38;5;" + strconv.Itoa(int(b)) + "m"
+func precomputeColors() {
+	for i := 0; i < 256; i++ {
+		var fg, bg string
+
+		// colors that are very dark
+		barelyVisible := i == 0 || (i >= 16 && i <= 20) || (i >= 232 && i <= 242)
+
+		if barelyVisible {
+			fg = WHITE_B + "\033[38;5;" + "255" + "m"
+			bg = "\033[48;5;" + strconv.Itoa(int(i)) + "m"
+
+		} else {
+			fg = WHITE_B + "\033[38;5;" + strconv.Itoa(int(i)) + "m"
+			bg = ""
+		}
+
+		colors[i] = bg + fg
 	}
-	return "\033[48;5;" + strconv.Itoa(int(b)) + "m"
 }
 
 func halfByteToAsciiHex(b byte) string {
