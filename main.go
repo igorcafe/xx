@@ -78,11 +78,13 @@ func getDumpLine(bytesRead []byte) (string, int) {
 	}
 
 	resBuilder := strings.Builder{}
+	resBuilder.Grow(413) // FIXME: magic number
 
 	// this is a workaround because I can't use len(res)
 	charCount := 0
 
 	asciiBuilder := strings.Builder{}
+	asciiBuilder.Grow(count)
 
 	for i := 0; i < count; i++ {
 		b := bytesRead[i]
@@ -116,7 +118,7 @@ func getDumpLine(bytesRead []byte) (string, int) {
 		}
 	}
 
-	maxLength := 53
+	maxLength := 53 // FIXME: magic number
 
 	resBuilder.WriteString(strings.Repeat(" ", maxLength-charCount))
 	resBuilder.WriteString(NO_COLOR)
