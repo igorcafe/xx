@@ -3,8 +3,10 @@ package main
 import (
 	"crypto/md5"
 	"encoding/hex"
+	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -84,6 +86,30 @@ func BenchmarkByteToHex_Sprintf1000(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		for j := 0; j < 1000; j++ {
 			_ = fmt.Sprintf("%02x", 100)
+		}
+	}
+}
+
+func BenchmarkColor256_1000(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		for j := 0; j < 1000; j++ {
+			_ = color256(123, true)
+		}
+	}
+}
+
+func BenchmarkItoa1000(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		for j := 0; j < 1000; j++ {
+			strconv.Itoa(200)
+		}
+	}
+}
+
+func BenchmarkSprintInt1000(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		for j := 0; j < 1000; j++ {
+			_ = fmt.Sprint(200)
 		}
 	}
 }

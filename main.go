@@ -5,12 +5,16 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 )
 
 const WHITE_B = "\033[1;37m"
 const NO_COLOR = "\033[0m"
 const NO_COLOR_B = "\033[1m"
+
+const ASCII_0_POSITION = byte(48)
+const ASCII_A_POSITION = byte(97)
 
 func main() {
 	if len(os.Args) < 2 {
@@ -88,7 +92,7 @@ func getDumpLine(bytesRead []byte) (string, int) {
 
 	for i := 0; i < count; i++ {
 		b := bytesRead[i]
-		fg := color256(b, true)
+		fg := ""
 		bg := ""
 
 		// colors that are barely readable with dark background
@@ -97,6 +101,8 @@ func getDumpLine(bytesRead []byte) (string, int) {
 		if useBrightBg {
 			fg = color256(255, true)
 			bg = color256(b, false)
+		} else {
+			fg = color256(b, true)
 		}
 
 		color := WHITE_B + bg + fg
@@ -125,41 +131,31 @@ func getDumpLine(bytesRead []byte) (string, int) {
 
 	resBuilder.WriteString(strings.Repeat(" ", maxLength-charCount))
 	resBuilder.WriteString(NO_COLOR)
-	resBuilder.WriteString(fmt.Sprintf("|%s|\n", asciiBuilder.String()))
+	resBuilder.WriteString("|" + asciiBuilder.String() + "|\n")
 
 	return resBuilder.String(), count
 }
 
 func color256(b byte, foreground bool) string {
-	colorType := 48
 	if foreground {
-		colorType = 38
+		return "\033[38;5;" + strconv.Itoa(int(b)) + "m"
 	}
+	return "\033[48;5;" + strconv.Itoa(int(b)) + "m"
+}
 
-	return fmt.Sprintf("\033[%d;5;%dm", colorType, b)
+func halfByteToAsciiHex(b byte) string {
+	half := b & 0x0F
+
+	if half <= 0x9 {
+		return string(half + ASCII_0_POSITION)
+	} else {
+		return string(half + ASCII_A_POSITION - 0x0a)
+	}
 }
 
 func byteToAsciiHex(b byte) string {
-	asciiZeroPosition := byte(48)
-	asciiAPosition := byte(97)
-
 	low := b & 0x0F
 	high := (b & 0xF0) >> 4
 
-	var lowString string
-	var highString string
-
-	if low <= 0x9 {
-		lowString = string(low + asciiZeroPosition)
-	} else {
-		lowString = string(low + asciiAPosition - 0x0a)
-	}
-
-	if high <= 0x9 {
-		highString = string(high + asciiZeroPosition)
-	} else {
-		highString = string(high + asciiAPosition - 0x0a)
-	}
-
-	return highString + lowString
+	return halfByteToAsciiHex(high) + halfByteToAsciiHex(low)
 }
