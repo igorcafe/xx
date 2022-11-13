@@ -77,7 +77,7 @@ func getDumpLine(bytesRead []byte) (string, int) {
 		count = 16
 	}
 
-	res := ""
+	resBuilder := strings.Builder{}
 
 	// this is a workaround because I can't use len(res)
 	charCount := 0
@@ -107,22 +107,22 @@ func getDumpLine(bytesRead []byte) (string, int) {
 			ascii += "."
 		}
 
-		res += fmt.Sprintf("%s%02x%s ", color, b, NO_COLOR)
+		resBuilder.WriteString(fmt.Sprintf("%s%02x%s ", color, b, NO_COLOR))
 		charCount += 3
 
 		if (i+1)%4 == 0 {
-			res += " "
+			resBuilder.WriteString(" ")
 			charCount += 1
 		}
 	}
 
 	maxLength := 53
 
-	res += strings.Repeat(" ", maxLength-charCount)
-	res += NO_COLOR
-	res += fmt.Sprintf("|%s|\n", ascii)
+	resBuilder.WriteString(strings.Repeat(" ", maxLength-charCount))
+	resBuilder.WriteString(NO_COLOR)
+	resBuilder.WriteString(fmt.Sprintf("|%s|\n", ascii))
 
-	return res, count
+	return resBuilder.String(), count
 }
 
 func color256(b byte, foreground bool) string {
