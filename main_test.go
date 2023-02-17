@@ -35,6 +35,8 @@ func getMd5String(b []byte) string {
 }
 
 func BenchmarkGetDumpLine(b *testing.B) {
+	precomputeColors()
+
 	buf := make([]byte, 16)
 
 	for i := 0; i < 16; i++ {
@@ -45,6 +47,12 @@ func BenchmarkGetDumpLine(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		_, _ = getDumpLine(buf)
+	}
+}
+
+func BenchmarkPrecomputeColors(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		precomputeColors()
 	}
 }
 
