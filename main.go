@@ -26,6 +26,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 	clr := &color{}
 	status := 0
 	if len(args) < 2 {
+		// FIXME: what if there is 2 arguments, but no positional argument?
 		fmt.Fprintf(stderr, "Missing positional argument filename.\nUsage: %s <file1> [file2] ...\n", args[0])
 		status = 1
 		return status
