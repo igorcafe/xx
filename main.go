@@ -12,10 +12,8 @@ import (
 
 func main() {
 	stdout := bufio.NewWriter(os.Stdout)
-	clr := &color{}
-	clr.compute()
 
-	status := run(os.Args, clr, stdout, os.Stderr)
+	status := run(os.Args, stdout, os.Stderr)
 	err := stdout.Flush()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
@@ -24,7 +22,8 @@ func main() {
 	os.Exit(status)
 }
 
-func run(args []string, clr *color, stdout io.Writer, stderr io.Writer) int {
+func run(args []string, stdout io.Writer, stderr io.Writer) int {
+	clr := &color{}
 	status := 0
 	if len(args) < 2 {
 		fmt.Fprintf(stderr, "Missing positional argument filename.\nUsage: %s <file1> [file2] ...\n", args[0])
@@ -39,6 +38,15 @@ func run(args []string, clr *color, stdout io.Writer, stderr io.Writer) int {
 	ascii := [16]byte{}
 
 	for _, arg := range args[1:] {
+		if arg == "-nocolor" {
+			clr.disable = true
+			continue
+		}
+
+		if !clr.disable {
+			clr.compute()
+		}
+
 		file, err := os.Open(arg)
 		if err != nil {
 			fmt.Fprintf(stderr, "Failed to open %s: %s\n", arg, err.Error())
