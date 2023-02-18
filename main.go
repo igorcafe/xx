@@ -1,169 +1,86 @@
 package main
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"io"
 	"os"
-	"strconv"
 	"strings"
 )
 
-const WHITE_B = "\033[1;37m"
-const NO_COLOR = "\033[0m"
-const NO_COLOR_B = "\033[1m"
-
-const ASCII_0_POSITION = byte(48)
-const ASCII_A_POSITION = byte(97)
-
-var colors [256]string
-
 func main() {
-	if len(os.Args) < 2 {
-		fmt.Printf("Usage: hx <filepath>\n")
-		os.Exit(1)
+	run(os.Args, os.Stdout, os.Stderr)
+}
+
+func run(args []string, stdout io.Writer, stderr io.Writer) int {
+	if len(args) < 2 {
+		fmt.Fprintf(stderr, "Missing positional argument filename.\nUsage: %s <file1> [file2] ...\n", args[0])
+		return 1
 	}
 
-	precomputeColors()
-	filepath := os.Args[1]
+	// total offset in bytes
+	i := 0
 
-	file, err := os.OpenFile(filepath, os.O_RDONLY, 0666) // FIXME: perm
-	if err != nil {
-		fmt.Printf("Failed to open file %s: %v\n", filepath, err)
-		os.Exit(1)
-	}
+	// ascii representation of byte
+	ascii := [16]byte{}
 
-	bytesRead := make([]byte, 1024*1024) // TODO: optimal buffer size
-	totalOffset := 0
-
-	for {
-		n, err := file.Read(bytesRead)
-		if errors.Is(err, io.EOF) {
-			break
-		}
-
+	for _, fname := range args[1:] {
+		file, err := os.Open(fname)
 		if err != nil {
-			fmt.Printf("Failed to read %d bytes from file %s: %v\n", len(bytesRead), filepath, err)
-			os.Exit(1)
+			fmt.Fprintf(stderr, "Failed to open %s: %s\n", fname, err.Error())
 		}
 
-		dumpBuffer(totalOffset, bytesRead[:n])
-	}
+		reader := bufio.NewReader(file)
 
-	fmt.Print(NO_COLOR)
-	fmt.Println()
-}
+		for {
+			b, err := reader.ReadByte()
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			if err != nil {
+				fmt.Fprintf(stderr, "Failed to read %s: %s\n", fname, err.Error())
+				break
+			}
 
-func dumpBuffer(totalOffset int, bytesRead []byte) {
-	prevLine := ""
-	printedAsterisk := false
+			if b >= 33 && b <= 126 {
+				ascii[i%16] = b
+			} else {
+				ascii[i%16] = '.'
+			}
 
-	for currentOffset := 0; currentOffset < len(bytesRead); {
-		line, bytesCount := getDumpLine(bytesRead[currentOffset:])
+			// print offset
+			if i%16 == 0 {
+				fmt.Fprintf(stdout, "%08x  ", i)
+			}
 
-		addr := NO_COLOR_B + fmt.Sprintf("%08x:", totalOffset) + NO_COLOR + "   "
+			// print byte
+			fmt.Fprintf(stdout, "%02x ", b)
 
-		if line != prevLine {
-			fmt.Print(addr, line)
-			prevLine = line
-			printedAsterisk = false
+			// extra space every 4 bytes
+			if (i+1)%4 == 0 {
+				fmt.Fprint(stdout, " ")
+			}
 
-		} else if !printedAsterisk {
-			fmt.Println("*")
-			printedAsterisk = true
-		}
+			// break line every 16 bytes
+			if (i+1)%16 == 0 {
+				fmt.Fprintln(stdout, "|"+string(ascii[:])+"|")
+			}
 
-		currentOffset += bytesCount
-		totalOffset += bytesCount
-	}
-}
-
-func getDumpLine(bytesRead []byte) (string, int) {
-	count := len(bytesRead)
-	if count > 16 {
-		count = 16
-	}
-
-	resBuilder := strings.Builder{}
-	resBuilder.Grow(208) // FIXME: magic number
-
-	// this is a workaround because I can't use resBuilder.Len()
-	charCount := 0
-
-	for i := 0; i < count; i++ {
-		b := bytesRead[i]
-		color := colors[b]
-
-		resBuilder.WriteString(color)
-		resBuilder.WriteString(byteToAsciiHex(b))
-		resBuilder.WriteString(NO_COLOR)
-		resBuilder.WriteString(" ")
-		charCount += 3
-
-		if (i+1)%4 == 0 {
-			resBuilder.WriteString(" ")
-			charCount += 1
+			i++
 		}
 	}
 
-	maxLength := 53 // FIXME: magic number
-	resBuilder.WriteString(strings.Repeat(" ", maxLength-charCount))
-	resBuilder.WriteString(NO_COLOR + "|")
+	// print offset
+	if i%16 != 0 {
 
-	for i := 0; i < count; i++ {
-		b := bytesRead[i]
-		color := colors[b]
+		// compute how many spaces are left for aligning ascii part
+		left := 16 - i%16
+		spaces := 3*left + left/4
 
-		isPrintableAscii := b >= 32 && b <= 126
-
-		if isPrintableAscii {
-			resBuilder.WriteString(color + string(b) + NO_COLOR)
-		} else {
-			resBuilder.WriteString(".")
-		}
+		fmt.Fprintln(stdout, strings.Repeat(" ", spaces)+"|"+string(ascii[:i%16])+"|")
+		fmt.Fprintf(stdout, "%08x\n", i)
 	}
 
-	resBuilder.WriteString(NO_COLOR + "|\n")
-
-	l := resBuilder.Len()
-	_ = l
-
-	return resBuilder.String(), count
-}
-
-func precomputeColors() {
-	for i := 0; i < 256; i++ {
-		var fg, bg string
-
-		// colors that are very dark
-		barelyVisible := i == 0 || (i >= 16 && i <= 20) || (i >= 232 && i <= 242)
-
-		if barelyVisible {
-			fg = WHITE_B + "\033[38;5;" + "255" + "m"
-			bg = "\033[48;5;" + strconv.Itoa(int(i)) + "m"
-
-		} else {
-			fg = WHITE_B + "\033[38;5;" + strconv.Itoa(int(i)) + "m"
-			bg = ""
-		}
-
-		colors[i] = bg + fg
-	}
-}
-
-func halfByteToAsciiHex(b byte) string {
-	half := b & 0x0F
-
-	if half <= 0x9 {
-		return string(half + ASCII_0_POSITION)
-	} else {
-		return string(half + ASCII_A_POSITION - 0x0a)
-	}
-}
-
-func byteToAsciiHex(b byte) string {
-	low := b & 0x0F
-	high := (b & 0xF0) >> 4
-
-	return halfByteToAsciiHex(high) + halfByteToAsciiHex(low)
+	return 0
 }
