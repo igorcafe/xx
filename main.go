@@ -79,9 +79,9 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 	// print offset
 	if i%16 != 0 {
 
-		// compute how many spaces are left for aligning ascii part
+		// compute how many spaces are left for padding ascii part
 		left := 16 - i%16
-		spaces := 3*left + left/4
+		spaces := 3*left + (left-1)/4 + 1
 
 		fmt.Fprintln(stdout, strings.Repeat(" ", spaces)+"|"+string(ascii[:i%16])+"|")
 		fmt.Fprintf(stdout, "%08x\n", i)
