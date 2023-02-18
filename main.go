@@ -10,7 +10,13 @@ import (
 )
 
 func main() {
-	status := run(os.Args, os.Stdout, os.Stderr)
+	stdout := bufio.NewWriter(os.Stdout)
+	status := run(os.Args, stdout, os.Stderr)
+	err := stdout.Flush()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+		status = 1
+	}
 	os.Exit(status)
 }
 
@@ -35,7 +41,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 			status = 1
 		}
 
-		reader := bufio.NewReader(file)
+		reader := bufio.NewReaderSize(file, 10*1024*1024)
 
 		for {
 			b, err := reader.ReadByte()
