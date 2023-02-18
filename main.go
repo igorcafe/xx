@@ -6,12 +6,16 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 )
 
 func main() {
 	stdout := bufio.NewWriter(os.Stdout)
-	status := run(os.Args, stdout, os.Stderr)
+	clr := &color{}
+	clr.compute()
+
+	status := run(os.Args, clr, stdout, os.Stderr)
 	err := stdout.Flush()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
@@ -20,7 +24,7 @@ func main() {
 	os.Exit(status)
 }
 
-func run(args []string, stdout io.Writer, stderr io.Writer) int {
+func run(args []string, clr *color, stdout io.Writer, stderr io.Writer) int {
 	status := 0
 	if len(args) < 2 {
 		fmt.Fprintf(stderr, "Missing positional argument filename.\nUsage: %s <file1> [file2] ...\n", args[0])
@@ -34,10 +38,10 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 	// ascii representation of byte
 	ascii := [16]byte{}
 
-	for _, fname := range args[1:] {
-		file, err := os.Open(fname)
+	for _, arg := range args[1:] {
+		file, err := os.Open(arg)
 		if err != nil {
-			fmt.Fprintf(stderr, "Failed to open %s: %s\n", fname, err.Error())
+			fmt.Fprintf(stderr, "Failed to open %s: %s\n", arg, err.Error())
 			status = 1
 		}
 
@@ -49,16 +53,12 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 				break
 			}
 			if err != nil {
-				fmt.Fprintf(stderr, "Failed to read %s: %s\n", fname, err.Error())
+				fmt.Fprintf(stderr, "Failed to read %s: %s\n", arg, err.Error())
 				status = 1
 				break
 			}
 
-			if b >= 33 && b <= 126 {
-				ascii[i%16] = b
-			} else {
-				ascii[i%16] = '.'
-			}
+			ascii[i%16] = b
 
 			// print offset
 			if i%16 == 0 {
@@ -66,16 +66,19 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 			}
 
 			// print byte
-			fmt.Fprintf(stdout, "%02x ", b)
+			fmt.Fprintf(stdout, clr.surround("%02x", b)+" ", b)
 
 			// extra space every 4 bytes
 			if (i+1)%4 == 0 {
 				fmt.Fprint(stdout, " ")
 			}
 
-			// break line every 16 bytes
+			// print ascii and break line every 16 bytes
 			if (i+1)%16 == 0 {
-				fmt.Fprintln(stdout, "|"+string(ascii[:])+"|")
+				fmt.Fprint(stdout, "|")
+				printAsciiRow(ascii[:i%16], clr, stdout)
+				fmt.Fprintln(stdout, "|")
+				ascii = [16]byte{}
 			}
 
 			i++
@@ -89,9 +92,59 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 		left := 16 - i%16
 		spaces := 3*left + (left-1)/4 + 1
 
-		fmt.Fprintln(stdout, strings.Repeat(" ", spaces)+"|"+string(ascii[:i%16])+"|")
+		fmt.Fprint(stdout, strings.Repeat(" ", spaces))
+		fmt.Fprint(stdout, "|")
+		printAsciiRow(ascii[:i%16], clr, stdout)
+		fmt.Fprintln(stdout, "|")
 		fmt.Fprintf(stdout, "%08x\n", i)
 	}
 
 	return status
+}
+
+func printAsciiRow(ascii []byte, clr *color, stdout io.Writer) {
+	var s string
+	for _, b := range ascii {
+
+		// is visible ascii
+		if b >= 33 && b <= 126 {
+			s = clr.surround(string(b), b)
+		} else {
+			s = clr.surround(".", b)
+		}
+
+		fmt.Fprint(stdout, s)
+	}
+}
+
+type color struct {
+	disable bool
+	values  [256]string
+}
+
+func (c *color) compute() {
+	const WHITE_B = "\033[1;37m"
+
+	for i := 0; i < 256; i++ {
+		var fg, bg string
+
+		// colors that are very hard to read on a dark background
+		barelyVisible := i == 0 || (i >= 16 && i <= 20) || (i >= 232 && i <= 242)
+
+		if barelyVisible {
+			fg = WHITE_B + "\033[38;5;" + "255" + "m"
+			bg = "\033[48;5;" + strconv.Itoa(int(i)) + "m"
+
+		} else {
+			fg = WHITE_B + "\033[38;5;" + strconv.Itoa(int(i)) + "m"
+			bg = ""
+		}
+
+		c.values[i] = bg + fg
+	}
+}
+
+func (c *color) surround(s string, clr byte) string {
+	const NO_COLOR = "\033[0m"
+	return c.values[clr] + s + NO_COLOR
 }
