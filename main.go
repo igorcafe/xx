@@ -10,13 +10,16 @@ import (
 )
 
 func main() {
-	run(os.Args, os.Stdout, os.Stderr)
+	status := run(os.Args, os.Stdout, os.Stderr)
+	os.Exit(status)
 }
 
 func run(args []string, stdout io.Writer, stderr io.Writer) int {
+	status := 0
 	if len(args) < 2 {
 		fmt.Fprintf(stderr, "Missing positional argument filename.\nUsage: %s <file1> [file2] ...\n", args[0])
-		return 1
+		status = 1
+		return status
 	}
 
 	// total offset in bytes
@@ -29,6 +32,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 		file, err := os.Open(fname)
 		if err != nil {
 			fmt.Fprintf(stderr, "Failed to open %s: %s\n", fname, err.Error())
+			status = 1
 		}
 
 		reader := bufio.NewReader(file)
@@ -40,6 +44,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 			}
 			if err != nil {
 				fmt.Fprintf(stderr, "Failed to read %s: %s\n", fname, err.Error())
+				status = 1
 				break
 			}
 
@@ -82,5 +87,5 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 		fmt.Fprintf(stdout, "%08x\n", i)
 	}
 
-	return 0
+	return status
 }
