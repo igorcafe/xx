@@ -6,11 +6,20 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime/pprof"
 	"strconv"
 	"strings"
 )
 
 func main() {
+	if os.Getenv("PPROF") != "" {
+		f, err := os.Create(os.Getenv("PPROF") + ".prof")
+		if err != nil {
+			panic(err)
+		}
+		pprof.StartCPUProfile(f)
+	}
+
 	stdout := bufio.NewWriter(os.Stdout)
 
 	status := run(os.Args, stdout, os.Stderr)
@@ -19,6 +28,11 @@ func main() {
 		fmt.Fprintln(os.Stderr, err.Error())
 		status = 1
 	}
+
+	if os.Getenv("PPROF") != "" {
+		pprof.StopCPUProfile()
+	}
+
 	os.Exit(status)
 }
 
