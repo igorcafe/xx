@@ -47,7 +47,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 
 	// total offset in bytes
-	i := 0
+	var i uint64 = 0
 
 	// ascii representation of byte
 	ascii := [16]byte{}
@@ -112,7 +112,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 	if i%16 != 0 {
 
 		// compute how many spaces are left for padding ascii part
-		left := 16 - i%16
+		left := int(16 - i%16)
 		spaces := 3*left + (left-1)/4 + 1
 
 		fmt.Fprint(stdout, strings.Repeat(" ", spaces))
