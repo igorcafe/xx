@@ -5,147 +5,111 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
-	"runtime/pprof"
 	"strconv"
-	"strings"
 )
 
 func main() {
-	if os.Getenv("PPROF") != "" {
-		f, err := os.Create(os.Getenv("PPROF") + ".prof")
-		if err != nil {
-			panic(err)
-		}
-		pprof.StartCPUProfile(f)
+	if len(os.Args) == 1 {
+		fmt.Fprintf(os.Stderr, "Usage:\n\t%s FILE1 [FILE2...]", os.Args[0])
+		os.Exit(1)
+		return
 	}
 
-	stdout := bufio.NewWriter(os.Stdout)
+	loadColors()
 
-	status := run(os.Args, stdout, os.Stderr)
-	err := stdout.Flush()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err.Error())
-		status = 1
-	}
-
-	if os.Getenv("PPROF") != "" {
-		pprof.StopCPUProfile()
-	}
-
-	os.Exit(status)
-}
-
-func run(args []string, stdout io.Writer, stderr io.Writer) int {
-	clr := &color{}
-	status := 0
-	if len(args) < 2 {
-		// FIXME: what if there is 2 arguments, but no positional argument?
-		fmt.Fprintf(stderr, "Missing positional argument filename.\nUsage: %s <file1> [file2] ...\n", args[0])
-		status = 1
-		return status
-	}
-
-	// total offset in bytes
-	var i uint64 = 0
-
-	// ascii representation of byte
-	ascii := [16]byte{}
-
-	for _, arg := range args[1:] {
-		if arg == "-nocolor" {
-			clr.disable = true
-			continue
-		}
-
-		if !clr.disable {
-			clr.compute()
-		}
-
-		file, err := os.Open(arg)
-		if err != nil {
-			fmt.Fprintf(stderr, "Failed to open %s: %s\n", arg, err.Error())
-			status = 1
-		}
-
-		reader := bufio.NewReaderSize(file, 10*1024*1024)
-
-		for {
-			b, err := reader.ReadByte()
-			if errors.Is(err, io.EOF) {
-				break
-			}
+	for _, path := range os.Args[1:] {
+		func() {
+			file, err := os.Open(path)
 			if err != nil {
-				fmt.Fprintf(stderr, "Failed to read %s: %s\n", arg, err.Error())
-				status = 1
-				break
+				log.Fatal(err)
 			}
+			defer file.Close()
 
-			ascii[i%16] = b
-
-			// print offset
-			if i%16 == 0 {
-				fmt.Fprintf(stdout, "%08x  ", i)
-			}
-
-			// print byte
-			fmt.Fprintf(stdout, clr.surround("%02x", b)+" ", b)
-
-			// extra space every 4 bytes
-			if (i+1)%4 == 0 {
-				fmt.Fprint(stdout, " ")
-			}
-
-			// print ascii and break line every 16 bytes
-			if (i+1)%16 == 0 {
-				fmt.Fprint(stdout, "|")
-				printAsciiRow(ascii[:i%16], clr, stdout)
-				fmt.Fprintln(stdout, "|")
-				ascii = [16]byte{}
-			}
-
-			i++
-		}
+			dump(os.Stdout, file)
+		}()
 	}
-
-	// print offset
-	if i%16 != 0 {
-
-		// compute how many spaces are left for padding ascii part
-		left := int(16 - i%16)
-		spaces := 3*left + (left-1)/4 + 1
-
-		fmt.Fprint(stdout, strings.Repeat(" ", spaces))
-		fmt.Fprint(stdout, "|")
-		printAsciiRow(ascii[:i%16], clr, stdout)
-		fmt.Fprintln(stdout, "|")
-		fmt.Fprintf(stdout, "%08x\n", i)
-	}
-
-	return status
 }
 
-func printAsciiRow(ascii []byte, clr *color, stdout io.Writer) {
-	var s string
-	for _, b := range ascii {
+func dump(w io.Writer, r io.Reader) error {
+	bufR := bufio.NewReader(r)
+	bufW := bufio.NewWriter(w)
+	offset := int64(-1)
+	row := make([]byte, 16)
 
-		// is visible ascii
-		if b >= 33 && b <= 126 {
-			s = clr.surround(string(b), b)
+	defer bufW.Flush()
+
+	for {
+		b, err := bufR.ReadByte()
+		if errors.Is(err, io.EOF) {
+			return dumpRow(bufW, offset, row)
+		}
+		if err != nil {
+			return err
+		}
+
+		offset++
+		rowOffset := offset % 16
+		row[rowOffset] = b
+
+		if offset > 0 && rowOffset == 15 {
+			if err := dumpRow(bufW, offset, row); err != nil {
+				return err
+			}
+		}
+	}
+}
+
+func dumpRow(w io.Writer, offset int64, row []byte) error {
+	rowLen := int(offset%16 + 1)
+
+	s := fmt.Sprintf("%08x", offset-int64(rowLen)+1) + "   "
+	for i := 0; i < 16; i++ {
+		if i < rowLen {
+			// args = append(args, row[i])
+			s += coloredByte(row[i]) + " "
 		} else {
-			s = clr.surround(".", b)
+			s += "   "
 		}
-
-		fmt.Fprint(stdout, s)
+		if (i+1)%4 == 0 {
+			s += " "
+		}
 	}
+
+	s += " |"
+	for i := 0; i < 16; i++ {
+		if i < rowLen {
+			b := byte('.')
+			if row[i] >= 33 && row[i] <= 126 {
+				b = row[i]
+			}
+			s += coloredString(string(b), row[i])
+		} else {
+			s += " "
+		}
+	}
+	s += "|\n"
+
+	_, err := fmt.Fprint(w, s)
+
+	return err
 }
 
-type color struct {
-	disable bool
-	values  [256]string
+func coloredString(s string, b byte) string {
+	// if b == 25 {
+	// 	fmt.Println("\n\nSHIT", strings.ReplaceAll(colors[b], "\\", ">"), s)
+	// }
+	return colors[b] + s + "\033[0m"
 }
 
-func (c *color) compute() {
+func coloredByte(b byte) string {
+	return fmt.Sprintf("%s%02x%s", colors[b], b, "\033[0m")
+}
+
+var colors [256]string
+
+func loadColors() {
 	const WHITE_B = "\033[1;37m"
 
 	for i := 0; i < 256; i++ {
@@ -163,11 +127,6 @@ func (c *color) compute() {
 			bg = ""
 		}
 
-		c.values[i] = bg + fg
+		colors[i] = bg + fg
 	}
-}
-
-func (c *color) surround(s string, clr byte) string {
-	const NO_COLOR = "\033[0m"
-	return c.values[clr] + s + NO_COLOR
 }
